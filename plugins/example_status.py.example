@@ -1,0 +1,17 @@
+from jarvis_home.schemas import RiskLevel
+from jarvis_home.tool_registry import ToolDefinition
+
+
+def register(registry, services):
+    def house_label():
+        return {"label": "Kota Home"}
+
+    registry.register(
+        ToolDefinition(
+            name="example.house_label",
+            description="Return a harmless custom house label.",
+            parameters={"type": "object", "properties": {}, "additionalProperties": False},
+            risk=RiskLevel.LOW,
+            handler=house_label,
+        )
+    )

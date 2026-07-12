@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jarvis-home"
+version = "1.0.0"
+description = "Local-first personal home AI with policy-controlled automation"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "Apache-2.0"}
+authors = [{name = "programmerKota"}]
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn[standard]>=0.34,<1",
+  "httpx>=0.28,<1",
+  "pydantic>=2.10,<3",
+  "pydantic-settings>=2.8,<3",
+  "cryptography>=44,<47",
+  "argon2-cffi>=23.1,<26",
+  "itsdangerous>=2.2,<3",
+  "python-multipart>=0.0.20,<1",
+  "croniter>=6,<7",
+  "PyYAML>=6.0,<7",
+  "typer>=0.15,<1",
+  "rich>=13.9,<15"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<9",
+  "pytest-asyncio>=0.25,<1",
+  "pytest-cov>=6,<7",
+  "ruff>=0.9,<1",
+  "mypy>=1.14,<2",
+  "pip-audit>=2.7,<3"
+]
+voice = ["faster-whisper>=1.1,<2"]
+
+[project.scripts]
+jarvis = "jarvis_home.cli:app"
+
+[tool.setuptools.packages.find]
+include = ["jarvis_home*"]
+
+[tool.setuptools.package-data]
+jarvis_home = ["static/*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-q --disable-warnings --maxfail=1"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "SIM"]
+ignore = ["S101", "B008"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true

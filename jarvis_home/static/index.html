@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#07111f">
+  <title>JARVIS Home</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="ambient ambient-a"></div>
+  <div class="ambient ambient-b"></div>
+
+  <main id="loginView" class="centered">
+    <section class="login-card glass">
+      <div class="mark">J</div>
+      <p class="eyebrow">LOCAL INTELLIGENCE</p>
+      <h1>JARVIS Home</h1>
+      <p class="muted">家・PC・記憶を、安全な承認層の内側で統合します。</p>
+      <form id="loginForm" class="stack">
+        <label>ユーザー名<input id="username" autocomplete="username" value="admin" required></label>
+        <label>パスワード<input id="password" type="password" autocomplete="current-password" required></label>
+        <button class="primary" type="submit">接続</button>
+      </form>
+      <p id="loginError" class="error"></p>
+    </section>
+  </main>
+
+  <div id="appView" class="app hidden">
+    <aside class="sidebar glass">
+      <div class="brand"><div class="mark small">J</div><div><strong>JARVIS</strong><span>HOME CORE</span></div></div>
+      <nav id="nav">
+        <button data-tab="chat" class="active">会話</button>
+        <button data-tab="home">ホーム</button>
+        <button data-tab="routines">ルーチン</button>
+        <button data-tab="memory">記憶</button>
+        <button data-tab="audit">監査</button>
+        <button data-tab="settings">設定</button>
+      </nav>
+      <div class="side-footer">
+        <div id="corePill" class="pill"><span></span>確認中</div>
+        <button id="logoutButton" class="ghost">ログアウト</button>
+      </div>
+    </aside>
+
+    <section class="workspace">
+      <header class="topbar glass">
+        <div><p class="eyebrow">PRIVATE HOUSEHOLD AI</p><h2 id="pageTitle">会話</h2></div>
+        <div class="top-actions"><button id="refreshButton" class="icon-button" title="更新">↻</button><time id="clock"></time></div>
+      </header>
+
+      <section id="tab-chat" class="tab active">
+        <div class="chat-layout">
+          <article class="chat-panel glass">
+            <div id="messages" class="messages">
+              <div class="message assistant"><div class="avatar">J</div><div class="bubble">お待ちしていました。家の状態確認、記憶、ルーチン、PC作業を依頼できます。</div></div>
+            </div>
+            <form id="chatForm" class="composer">
+              <button id="voiceButton" type="button" class="icon-button" title="ローカル音声入力">◉</button>
+              <textarea id="messageInput" rows="1" placeholder="指示を入力…" required></textarea>
+              <button class="primary send" type="submit">送信</button>
+            </form>
+          </article>
+          <aside class="rail">
+            <article class="glass card"><div class="card-head"><h3>承認待ち</h3><span id="approvalCount" class="badge">0</span></div><div id="approvals" class="compact-list empty">ありません</div></article>
+            <article class="glass card"><div class="card-head"><h3>接続状態</h3></div><div id="quickStatus" class="status-grid"></div></article>
+          </aside>
+        </div>
+      </section>
+
+      <section id="tab-home" class="tab">
+        <div class="section-grid">
+          <article class="glass card span-2"><div class="card-head"><h3>Home Assistant エンティティ</h3><div class="inline"><select id="domainFilter"><option value="">すべて</option><option>light</option><option>climate</option><option>switch</option><option>sensor</option><option>lock</option><option>media_player</option></select><button id="loadEntities" class="secondary">取得</button></div></div><div id="entities" class="entity-grid empty">Home Assistantを接続すると表示されます。</div></article>
+          <article class="glass card"><h3>システム</h3><div id="fullStatus" class="definition-list"></div></article>
+          <article class="glass card"><h3>バックアップ</h3><p class="muted">DBと暗号化済み設定を原子的に保存します。マスターキーは含みません。</p><button id="backupButton" class="secondary">今すぐ作成</button><div id="backupResult" class="result"></div></article>
+        </div>
+      </section>
+
+      <section id="tab-routines" class="tab">
+        <div class="section-grid">
+          <article class="glass card span-2"><div class="card-head"><h3>保存済みルーチン</h3><button id="reloadRoutines" class="secondary">更新</button></div><div id="routineList" class="compact-list empty">まだありません</div></article>
+          <article class="glass card"><h3>ルーチン作成</h3><form id="routineForm" class="stack"><label>名前<input id="routineName" required placeholder="例：就寝"></label><label>説明<input id="routineDescription" placeholder="任意"></label><label>Cron<input id="routineCron" placeholder="例：0 23 * * *"></label><label>ステップ（JSON）<textarea id="routineSteps" rows="9" required>[{"tool":"home.call_service","arguments":{"domain":"light","service":"turn_off","target":{"entity_id":"light.living_room"}}}]</textarea></label><button class="primary" type="submit">保存</button></form><p id="routineError" class="error"></p></article>
+        </div>
+      </section>
+
+      <section id="tab-memory" class="tab">
+        <div class="section-grid">
+          <article class="glass card"><h3>記憶を追加</h3><form id="memoryForm" class="stack"><label>内容<textarea id="memoryContent" rows="5" required></textarea></label><label>種類<select id="memoryKind"><option>note</option><option>preference</option><option>fact</option><option>routine_context</option></select></label><label>重要度<input id="memoryImportance" type="range" min="1" max="10" value="5"><span id="importanceValue">5</span></label><label>タグ<input id="memoryTags" placeholder="家, 勉強"></label><button class="primary" type="submit">記憶する</button></form></article>
+          <article class="glass card span-2"><div class="card-head"><h3>長期記憶</h3><div class="inline"><input id="memoryQuery" placeholder="検索"><button id="searchMemory" class="secondary">検索</button></div></div><div id="memoryList" class="compact-list empty">まだありません</div></article>
+        </div>
+      </section>
+
+      <section id="tab-audit" class="tab">
+        <article class="glass card"><div class="card-head"><div><h3>改ざん検知監査ログ</h3><p id="auditIntegrity" class="muted"></p></div><button id="loadAudit" class="secondary">更新</button></div><div class="table-wrap"><table><thead><tr><th>時刻</th><th>主体</th><th>操作</th><th>対象</th><th>結果</th></tr></thead><tbody id="auditRows"></tbody></table></div></article>
+      </section>
+
+      <section id="tab-settings" class="tab">
+        <div class="section-grid">
+          <article class="glass card"><h3>ローカルLLM</h3><form id="ollamaForm" class="stack"><label>Ollama URL<input id="ollamaUrl" required></label><label>モデル<input id="ollamaModel" required></label><button class="primary" type="submit">保存</button></form></article>
+          <article class="glass card"><h3>Home Assistant</h3><form id="haForm" class="stack"><label>URL<input id="haUrl" required></label><label>長期アクセストークン<input id="haToken" type="password" placeholder="変更時のみ入力"></label><button class="primary" type="submit">暗号化して保存</button></form></article>
+          <article class="glass card"><h3>安全設計</h3><ul class="security-list"><li>LLMから実行層を分離</li><li>物理操作はポリシー判定</li><li>中・高リスク操作は明示承認</li><li>秘密情報はFernet暗号化</li><li>監査ログはSHA-256ハッシュチェーン</li><li>シェルは既定無効・許可コマンド限定</li></ul></article>
+        </div>
+      </section>
+    </section>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>
