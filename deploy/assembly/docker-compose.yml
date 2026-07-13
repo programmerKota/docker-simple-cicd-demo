@@ -26,6 +26,7 @@ services:
       JARVIS_MASTER_KEY_FILE: /app/master.key
       JARVIS_OPA_URL: http://opa:8181
       JARVIS_DBOS_DATABASE_URL: postgresql://jarvis:${JARVIS_DBOS_PASSWORD:?JARVIS_DBOS_PASSWORD is required}@postgres:5432/jarvis
+      JARVIS_NATS_URL: nats://nats:4222
     ports:
       - "127.0.0.1:8787:8787"
     volumes:
@@ -34,6 +35,8 @@ services:
       - ../../master.key:/app/master.key:ro
     depends_on:
       postgres:
+        condition: service_healthy
+      nats:
         condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -55,6 +58,8 @@ services:
       JARVIS_MASTER_KEY_FILE: /app/master.key
       JARVIS_OPA_URL: http://opa:8181
       JARVIS_DBOS_DATABASE_URL: ""
+      JARVIS_NATS_URL: ""
+      JARVIS_NATS_TOKEN: ""
     expose:
       - "8790"
     volumes:
@@ -125,6 +130,28 @@ services:
       retries: 10
       start_period: 20s
 
+  nats:
+    image: nats:2.14.3-alpine
+    command: ["-c", "/etc/nats/nats.conf"]
+    expose:
+      - "4222"
+      - "8222"
+    volumes:
+      - ../../runtime/nats.conf:/etc/nats/nats.conf:ro
+      - nats-data:/data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
   openjarvis:
     build:
       context: https://github.com/open-jarvis/OpenJarvis.git#6240c59ca3305c5656075cc54cd7ff32df8dca0e
@@ -158,4 +185,5 @@ volumes:
   jarvis-data:
   jarvis-backups:
   dbos-postgres:
+  nats-data:
   openjarvis-data:
