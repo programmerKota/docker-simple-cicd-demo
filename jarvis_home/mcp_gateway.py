@@ -13,8 +13,10 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from .application import Application
 from .config import Settings, get_settings
+from .integrations.home_assistant_ws import HomeAssistantWebSocketClient
 from .integrations.opa import OPAClient, PolicyDecision
 from .schemas import ToolInvocation, UserContext
+from .services.household_twin import HouseholdTwin
 
 _ENTITY_ID = re.compile(r"^[a-z0-9_]+\.[a-z0-9_]+$")
 _DOMAIN = re.compile(r"^[a-z0-9_]+$")
@@ -59,9 +61,19 @@ class HomeGateway:
         self,
         application: Application,
         policy_client: PolicyClient | None = None,
+        household_twin: HouseholdTwin | None = None,
     ):
         self.application = application
         self.policy_client = policy_client or OPAClient(application.settings.opa_url)
+        home_assistant_url = application.db.get_setting(
+            "home_assistant_url", application.settings.home_assistant_url
+        )
+        home_assistant_token = application.secrets.get("home_assistant_token", "")
+        self.household_twin = household_twin or HouseholdTwin(
+            application.settings.twin_store_path,
+            HomeAssistantWebSocketClient(str(home_assistant_url), home_assistant_token),
+            refresh_interval_seconds=application.settings.twin_refresh_interval_seconds,
+        )
         self.agent_user = UserContext(
             username=application.settings.admin_username,
             role="agent",
@@ -75,6 +87,7 @@ class HomeGateway:
             "home_assistant": status["home_assistant"],
             "policy": await self.policy_client.health(),
             "audit": status["audit"],
+            "household_twin": self.household_twin.status(),
             "pending_approvals": len(
                 self.application.approvals.list_pending(self.application.settings.admin_username)
             ),
@@ -107,6 +120,37 @@ class HomeGateway:
             self.agent_user,
         )
         return result.model_dump(mode="json")
+
+    async def twin_summary(self) -> dict[str, Any]:
+        await self.household_twin.ensure_fresh()
+        return self.household_twin.summary()
+
+    async def find_twin_entities(
+        self,
+        room: str = "",
+        domain: str = "",
+        state: str = "",
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        freshness = await self.household_twin.ensure_fresh()
+        return {
+            "twin": freshness,
+            "entities": self.household_twin.find_entities(
+                room=room,
+                domain=domain,
+                state=state,
+                limit=limit,
+            ),
+        }
+
+    async def explain_twin_entity(self, entity_id: str) -> dict[str, Any]:
+        normalized_entity = entity_id.strip().lower()
+        self._validate_entity_id(normalized_entity)
+        await self.household_twin.ensure_fresh()
+        try:
+            return self.household_twin.explain_entity(normalized_entity)
+        except KeyError as exc:
+            raise ValueError(f"Entity is not present in the household twin: {normalized_entity}") from exc
 
     async def propose_light_action(
         self,
@@ -184,16 +228,22 @@ def build_mcp_app(
     settings: Settings | None = None,
     application: Application | None = None,
     policy_client: PolicyClient | None = None,
+    household_twin: HouseholdTwin | None = None,
 ) -> ASGIApp:
     settings = settings or get_settings()
     application = application or Application(settings)
-    gateway = HomeGateway(application, policy_client=policy_client)
+    gateway = HomeGateway(
+        application,
+        policy_client=policy_client,
+        household_twin=household_twin,
+    )
     mcp = FastMCP(
         "JARVIS Home Safety Gateway",
         instructions=(
-            "Observe the home through read-only tools. Physical light changes are idempotent "
-            "turn_on or turn_off proposals: they pass an external policy service and create "
-            "an owner approval request. Never claim execution before a state witness confirms it."
+            "Use the household twin for room/device meaning and reported state. Physical light "
+            "changes are idempotent turn_on or turn_off proposals: they pass an external policy "
+            "service and create an owner approval request. Never claim execution before a state "
+            "witness confirms it."
         ),
         host=settings.mcp_host,
         port=settings.mcp_port,
@@ -204,7 +254,7 @@ def build_mcp_app(
 
     @mcp.tool(name="home_gateway_status")
     async def home_gateway_status() -> dict[str, Any]:
-        """Read gateway, Home Assistant, policy, audit-chain, and approval status."""
+        """Read gateway, integrations, audit, twin freshness, and approval status."""
         return await gateway.status()
 
     @mcp.tool(name="home_observe")
@@ -213,8 +263,28 @@ def build_mcp_app(
         domain: str = "",
         limit: int = 50,
     ) -> dict[str, Any]:
-        """Read one entity or a bounded list of Home Assistant entity states."""
+        """Read one entity or a bounded list of raw Home Assistant entity states."""
         return await gateway.observe(entity_id=entity_id, domain=domain, limit=limit)
+
+    @mcp.tool(name="home_twin_summary")
+    async def home_twin_summary() -> dict[str, Any]:
+        """Summarize the last-known-good semantic model of rooms, devices, and entities."""
+        return await gateway.twin_summary()
+
+    @mcp.tool(name="home_find_entities")
+    async def home_find_entities(
+        room: str = "",
+        domain: str = "",
+        state: str = "",
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """Find entities by resolved room, exact domain, and exact reported state."""
+        return await gateway.find_twin_entities(room, domain, state, limit)
+
+    @mcp.tool(name="home_explain_entity")
+    async def home_explain_entity(entity_id: str) -> dict[str, Any]:
+        """Explain one entity's room, device, type, availability, and reported state."""
+        return await gateway.explain_twin_entity(entity_id)
 
     @mcp.tool(name="home_propose_light_action")
     async def home_propose_light_action(
