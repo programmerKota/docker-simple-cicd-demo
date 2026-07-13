@@ -54,9 +54,9 @@ def integration_settings(tmp_path: Path) -> Settings:
         data_dir=tmp_path / "data",
         backup_dir=tmp_path / "backups",
         master_key_file=tmp_path / "master.key",
-        session_secret="integration-session-secret-that-is-long-enough-123456",
+        session_secret="integration-session-secret-that-is-long-enough-123456",  # noqa: S106
         admin_username="admin",
-        admin_password="integration-password",
+        admin_password="integration-password",  # noqa: S106
         trusted_hosts="testserver,localhost,127.0.0.1",
         allowed_origins="http://testserver",
         dbos_database_url=DATABASE_URL,
