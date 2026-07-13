@@ -33,7 +33,7 @@ class BearerTokenGate:
         if len(token) < 32:
             raise RuntimeError("JARVIS_MCP_TOKEN must contain at least 32 characters")
         self.app = app
-        self.expected = f"Bearer {token}".encode("utf-8")
+        self.expected = f"Bearer {token}".encode()
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
