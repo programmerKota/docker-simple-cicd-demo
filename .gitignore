@@ -10,6 +10,7 @@ htmlcov/
 master.key
 data/
 backups/
+runtime/
 .DS_Store
 *.log
 build/
