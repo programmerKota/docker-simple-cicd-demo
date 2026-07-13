@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     mcp_port: int = Field(default=8790, ge=1, le=65535)
     mcp_token: str = ""
     opa_url: str = "http://127.0.0.1:8181"
+    dbos_database_url: str = ""
+    state_witness_attempts: int = Field(default=8, ge=1, le=60)
+    state_witness_interval_seconds: float = Field(default=1.0, ge=0.1, le=10.0)
     data_dir: Path = Path("./data")
     backup_dir: Path = Path("./backups")
     master_key_file: Path = Path("./master.key")
@@ -78,6 +81,10 @@ class Settings(BaseSettings):
     @property
     def enabled_plugin_set(self) -> set[str]:
         return {v.strip() for v in self.enabled_plugins.split(",") if v.strip()}
+
+    @property
+    def durable_workflows_enabled(self) -> bool:
+        return bool(self.dbos_database_url.strip())
 
     def ensure_directories(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
