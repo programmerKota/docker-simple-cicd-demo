@@ -68,15 +68,12 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
-          context: .
-          file: deploy/assembly/Dockerfile.openjarvis
+          context: https://github.com/open-jarvis/OpenJarvis.git#6240c59ca3305c5656075cc54cd7ff32df8dca0e
+          file: deploy/docker/Dockerfile
           push: false
           tags: jarvis-home-openjarvis-compat:test
-          build-args: |
-            OPENJARVIS_REV=6240c59ca3305c5656075cc54cd7ff32df8dca0e
           cache-from: type=gha,scope=openjarvis
           cache-to: type=gha,mode=max,scope=openjarvis
