@@ -4,7 +4,7 @@ import rego.v1
 
 policy_version := "home-policy-v1"
 
-allowed_light_services := {"turn_on", "turn_off", "toggle"}
+allowed_light_services := {"turn_on", "turn_off"}
 
 default decision := {
     "allow": false,
@@ -16,7 +16,7 @@ default decision := {
 decision := {
     "allow": true,
     "require_approval": true,
-    "reason": "A local OpenJarvis agent may propose a bounded light action; owner approval remains mandatory",
+    "reason": "A local OpenJarvis agent may propose an idempotent light action; owner approval remains mandatory",
     "policy_version": policy_version,
 } if {
     input.schema_version == 1
