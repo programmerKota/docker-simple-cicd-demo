@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     nats_connect_timeout_seconds: float = Field(default=3.0, ge=0.1, le=30.0)
     nats_publish_timeout_seconds: float = Field(default=3.0, ge=0.1, le=30.0)
     nats_duplicate_window_seconds: float = Field(default=86_400.0, ge=60.0, le=604_800.0)
+    twin_refresh_interval_seconds: float = Field(default=60.0, ge=5.0, le=3600.0)
     data_dir: Path = Path("./data")
     backup_dir: Path = Path("./backups")
     master_key_file: Path = Path("./master.key")
@@ -69,6 +70,10 @@ class Settings(BaseSettings):
     @property
     def database_path(self) -> Path:
         return self.data_dir / "jarvis.db"
+
+    @property
+    def twin_store_path(self) -> Path:
+        return self.data_dir / "household-twin"
 
     @property
     def origin_list(self) -> list[str]:
