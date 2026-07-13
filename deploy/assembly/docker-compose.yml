@@ -25,12 +25,16 @@ services:
       JARVIS_BACKUP_DIR: /app/backups
       JARVIS_MASTER_KEY_FILE: /app/master.key
       JARVIS_OPA_URL: http://opa:8181
+      JARVIS_DBOS_DATABASE_URL: postgresql://jarvis:${JARVIS_DBOS_PASSWORD:?JARVIS_DBOS_PASSWORD is required}@postgres:5432/jarvis
     ports:
       - "127.0.0.1:8787:8787"
     volumes:
       - jarvis-data:/app/data
       - jarvis-backups:/app/backups
       - ../../master.key:/app/master.key:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway"
     <<: *jarvis-security
@@ -50,6 +54,7 @@ services:
       JARVIS_BACKUP_DIR: /app/backups
       JARVIS_MASTER_KEY_FILE: /app/master.key
       JARVIS_OPA_URL: http://opa:8181
+      JARVIS_DBOS_DATABASE_URL: ""
     expose:
       - "8790"
     volumes:
@@ -91,6 +96,35 @@ services:
       retries: 5
       start_period: 10s
 
+  postgres:
+    image: postgres:18.2-bookworm
+    environment:
+      POSTGRES_DB: jarvis
+      POSTGRES_USER: jarvis
+      POSTGRES_PASSWORD: ${JARVIS_DBOS_PASSWORD:?JARVIS_DBOS_PASSWORD is required}
+      POSTGRES_INITDB_ARGS: --data-checksums
+    expose:
+      - "5432"
+    volumes:
+      - dbos-postgres:/var/lib/postgresql
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jarvis -d jarvis"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
   openjarvis:
     build:
       context: https://github.com/open-jarvis/OpenJarvis.git#6240c59ca3305c5656075cc54cd7ff32df8dca0e
@@ -123,4 +157,5 @@ services:
 volumes:
   jarvis-data:
   jarvis-backups:
+  dbos-postgres:
   openjarvis-data:
