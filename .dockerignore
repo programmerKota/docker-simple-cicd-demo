@@ -6,5 +6,6 @@ __pycache__
 .ruff_cache
 data
 backups
+runtime
 .env
 master.key
