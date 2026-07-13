@@ -17,6 +17,7 @@ from .api import approvals, audit, auth, backup, chat, home, memory, routines, s
 from .application import Application
 from .config import Settings, get_settings
 from .services.durable_runtime import get_durable_actions
+from .services.event_runtime import get_event_relay
 
 
 class RequestSecurityMiddleware:
@@ -72,21 +73,28 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     jarvis = Application(settings)
     durable_actions = get_durable_actions(jarvis)
+    event_relay = get_event_relay(jarvis)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         await jarvis.routines.start()
+        await event_relay.start()
         recovered = await durable_actions.recover_approved_without_result()
         jarvis.audit.record(
             "system",
             "application.start",
             "jarvis",
             "success",
-            {"recovered_approvals": recovered, "durable_workflows": durable_actions.enabled},
+            {
+                "recovered_approvals": recovered,
+                "durable_workflows": durable_actions.enabled,
+                "event_stream": event_relay.enabled,
+            },
         )
         try:
             yield
         finally:
+            await event_relay.stop()
             await jarvis.routines.stop()
             jarvis.audit.record("system", "application.stop", "jarvis", "success")
 
