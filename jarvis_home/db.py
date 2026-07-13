@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def utcnow() -> str:
@@ -185,6 +185,18 @@ class Database:
                     payload_json TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS event_outbox (
+                    event_id TEXT PRIMARY KEY,
+                    subject TEXT NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    publish_attempts INTEGER NOT NULL DEFAULT 0,
+                    last_error TEXT,
+                    published_at TEXT,
+                    stream_sequence INTEGER
+                );
+                CREATE INDEX IF NOT EXISTS idx_event_outbox_pending
+                    ON event_outbox(published_at, created_at);
                 """
             )
             conn.execute(

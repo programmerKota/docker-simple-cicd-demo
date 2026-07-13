@@ -73,6 +73,28 @@ class ApprovalService:
         )
         return [self._to_model(row) for row in rows]
 
+    def list_approved_without_result(self) -> list[tuple[str, str, ToolInvocation]]:
+        rows = self.db.query_all(
+            """
+            SELECT id, username, tool_name, arguments_json, conversation_id
+            FROM approvals
+            WHERE status='approved' AND result_json IS NULL
+            ORDER BY decided_at, created_at
+            """
+        )
+        return [
+            (
+                row["id"],
+                row["username"],
+                ToolInvocation(
+                    tool_name=row["tool_name"],
+                    arguments=json.loads(row["arguments_json"]),
+                    conversation_id=row["conversation_id"],
+                ),
+            )
+            for row in rows
+        ]
+
     def claim(self, approval_id: str, username: str, approved: bool) -> ToolInvocation | None:
         with self.db.transaction() as conn:
             row = conn.execute("SELECT * FROM approvals WHERE id=?", (approval_id,)).fetchone()

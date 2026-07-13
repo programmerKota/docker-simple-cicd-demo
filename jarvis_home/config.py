@@ -19,6 +19,22 @@ class Settings(BaseSettings):
     env: Literal["development", "test", "production"] = "development"
     host: str = "127.0.0.1"
     port: int = 8787
+    mcp_host: str = "127.0.0.1"
+    mcp_port: int = Field(default=8790, ge=1, le=65535)
+    mcp_token: str = ""
+    opa_url: str = "http://127.0.0.1:8181"
+    dbos_database_url: str = ""
+    state_witness_attempts: int = Field(default=8, ge=1, le=60)
+    state_witness_interval_seconds: float = Field(default=1.0, ge=0.1, le=10.0)
+    nats_url: str = ""
+    nats_token: str = ""
+    nats_stream: str = "JARVIS_HOME_EVENTS"
+    nats_batch_size: int = Field(default=100, ge=1, le=1000)
+    nats_flush_interval_seconds: float = Field(default=1.0, ge=0.1, le=60.0)
+    nats_connect_timeout_seconds: float = Field(default=3.0, ge=0.1, le=30.0)
+    nats_publish_timeout_seconds: float = Field(default=3.0, ge=0.1, le=30.0)
+    nats_duplicate_window_seconds: float = Field(default=86_400.0, ge=60.0, le=604_800.0)
+    twin_refresh_interval_seconds: float = Field(default=60.0, ge=5.0, le=3600.0)
     data_dir: Path = Path("./data")
     backup_dir: Path = Path("./backups")
     master_key_file: Path = Path("./master.key")
@@ -56,6 +72,10 @@ class Settings(BaseSettings):
         return self.data_dir / "jarvis.db"
 
     @property
+    def twin_store_path(self) -> Path:
+        return self.data_dir / "household-twin"
+
+    @property
     def origin_list(self) -> list[str]:
         return [v.strip() for v in self.allowed_origins.split(",") if v.strip()]
 
@@ -75,6 +95,14 @@ class Settings(BaseSettings):
     def enabled_plugin_set(self) -> set[str]:
         return {v.strip() for v in self.enabled_plugins.split(",") if v.strip()}
 
+    @property
+    def durable_workflows_enabled(self) -> bool:
+        return bool(self.dbos_database_url.strip())
+
+    @property
+    def event_stream_enabled(self) -> bool:
+        return bool(self.nats_url.strip() and self.nats_token.strip())
+
     def ensure_directories(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.backup_dir.mkdir(parents=True, exist_ok=True)
@@ -90,6 +118,8 @@ class Settings(BaseSettings):
             errors.append("JARVIS_SESSION_SECRET is still a default value")
         if "*" in self.origin_list:
             errors.append("Wildcard CORS origins are forbidden in production")
+        if self.nats_url and len(self.nats_token) < 32:
+            errors.append("JARVIS_NATS_TOKEN must contain at least 32 characters")
         return errors
 
 

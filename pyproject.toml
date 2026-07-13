@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jarvis-home"
-version = "1.0.0"
-description = "Local-first personal home AI with policy-controlled automation"
+version = "1.1.0a1"
+description = "Local-first household safety gateway and home intelligence layer"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "Apache-2.0"}
@@ -16,21 +16,26 @@ dependencies = [
   "httpx>=0.28,<1",
   "pydantic>=2.10,<3",
   "pydantic-settings>=2.8,<3",
-  "cryptography>=44,<47",
+  "cryptography>=48.0.1,<49",
   "argon2-cffi>=23.1,<26",
   "itsdangerous>=2.2,<3",
   "python-multipart>=0.0.20,<1",
   "croniter>=6,<7",
   "PyYAML>=6.0,<7",
   "typer>=0.15,<1",
-  "rich>=13.9,<15"
+  "rich>=13.9,<15",
+  "mcp==1.28.1",
+  "dbos==2.26.0",
+  "nats-py==2.15.0",
+  "pyoxigraph==0.5.9",
+  "websockets>=15,<17"
 ]
 
 [project.optional-dependencies]
 dev = [
-  "pytest>=8.3,<9",
-  "pytest-asyncio>=0.25,<1",
-  "pytest-cov>=6,<7",
+  "pytest>=9.0.3,<10",
+  "pytest-asyncio>=1,<2",
+  "pytest-cov>=7.1,<8",
   "ruff>=0.9,<1",
   "mypy>=1.14,<2",
   "pip-audit>=2.7,<3"
@@ -39,6 +44,7 @@ voice = ["faster-whisper>=1.1,<2"]
 
 [project.scripts]
 jarvis = "jarvis_home.cli:app"
+jarvis-home-mcp = "jarvis_home.mcp_gateway:serve"
 
 [tool.setuptools.packages.find]
 include = ["jarvis_home*"]

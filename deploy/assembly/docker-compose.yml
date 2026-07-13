@@ -1,0 +1,189 @@
+name: jarvis-home-assembly
+
+x-jarvis-build: &jarvis-build
+  context: ../..
+  dockerfile: Dockerfile
+
+x-jarvis-security: &jarvis-security
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  read_only: true
+  restart: unless-stopped
+
+services:
+  jarvis-ui:
+    image: jarvis-home:assembly-v2
+    build: *jarvis-build
+    env_file:
+      - ../../.env
+    environment:
+      JARVIS_HOST: 0.0.0.0
+      JARVIS_PORT: 8787
+      JARVIS_DATA_DIR: /app/data
+      JARVIS_BACKUP_DIR: /app/backups
+      JARVIS_MASTER_KEY_FILE: /app/master.key
+      JARVIS_OPA_URL: http://opa:8181
+      JARVIS_DBOS_DATABASE_URL: postgresql://jarvis:${JARVIS_DBOS_PASSWORD:?JARVIS_DBOS_PASSWORD is required}@postgres:5432/jarvis
+      JARVIS_NATS_URL: nats://nats:4222
+    ports:
+      - "127.0.0.1:8787:8787"
+    volumes:
+      - jarvis-data:/app/data
+      - jarvis-backups:/app/backups
+      - ../../master.key:/app/master.key:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    <<: *jarvis-security
+    tmpfs:
+      - /tmp:size=128m,noexec,nosuid,nodev
+
+  jarvis-mcp:
+    image: jarvis-home:assembly-v2
+    build: *jarvis-build
+    env_file:
+      - ../../.env
+    command: ["jarvis-home-mcp"]
+    environment:
+      JARVIS_MCP_HOST: 0.0.0.0
+      JARVIS_MCP_PORT: 8790
+      JARVIS_DATA_DIR: /app/data
+      JARVIS_BACKUP_DIR: /app/backups
+      JARVIS_MASTER_KEY_FILE: /app/master.key
+      JARVIS_OPA_URL: http://opa:8181
+      JARVIS_DBOS_DATABASE_URL: ""
+      JARVIS_NATS_URL: ""
+      JARVIS_NATS_TOKEN: ""
+    expose:
+      - "8790"
+    volumes:
+      - jarvis-data:/app/data
+      - jarvis-backups:/app/backups
+      - ../../master.key:/app/master.key:ro
+    depends_on:
+      opa:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    <<: *jarvis-security
+    tmpfs:
+      - /tmp:size=128m,noexec,nosuid,nodev
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.create_connection(('127.0.0.1',8790),3); s.close()"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  opa:
+    image: openpolicyagent/opa:1.18.2-static
+    command: ["run", "--server", "--addr=0.0.0.0:8181", "--log-format=json", "/policies"]
+    expose:
+      - "8181"
+    volumes:
+      - ../../policies:/policies:ro
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    healthcheck:
+      test: ["CMD", "/opa", "eval", "data.jarvis.home.policy_version", "--data", "/policies"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  postgres:
+    image: postgres:18.2-bookworm
+    environment:
+      POSTGRES_DB: jarvis
+      POSTGRES_USER: jarvis
+      POSTGRES_PASSWORD: ${JARVIS_DBOS_PASSWORD:?JARVIS_DBOS_PASSWORD is required}
+      POSTGRES_INITDB_ARGS: --data-checksums
+    expose:
+      - "5432"
+    volumes:
+      - dbos-postgres:/var/lib/postgresql
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jarvis -d jarvis"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  nats:
+    image: nats:2.14.3-alpine
+    command: ["-c", "/etc/nats/nats.conf"]
+    expose:
+      - "4222"
+      - "8222"
+    volumes:
+      - ../../runtime/nats.conf:/etc/nats/nats.conf:ro
+      - nats-data:/data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  openjarvis:
+    build:
+      context: https://github.com/open-jarvis/OpenJarvis.git#6240c59ca3305c5656075cc54cd7ff32df8dca0e
+      dockerfile: deploy/docker/Dockerfile
+    env_file:
+      - ../../.env
+    environment:
+      OPENJARVIS_HOME: /home/openjarvis/.openjarvis
+      OPENJARVIS_CONFIG: /config/openjarvis-config.toml
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - openjarvis-data:/home/openjarvis/.openjarvis
+      - ../../runtime/openjarvis-config.toml:/config/openjarvis-config.toml:ro
+    depends_on:
+      jarvis-mcp:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    <<: *jarvis-security
+    tmpfs:
+      - /tmp:size=256m,noexec,nosuid,nodev
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+volumes:
+  jarvis-data:
+  jarvis-backups:
+  dbos-postgres:
+  nats-data:
+  openjarvis-data:
