@@ -66,6 +66,9 @@ def render_openjarvis_config(root: Path, env: dict[str, str]) -> Path:
                 "include_tools": [
                     "home_gateway_status",
                     "home_observe",
+                    "home_twin_summary",
+                    "home_find_entities",
+                    "home_explain_entity",
                     "home_propose_light_action",
                     "home_list_pending_approvals",
                 ],
