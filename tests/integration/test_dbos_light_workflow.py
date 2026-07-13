@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from jarvis_home.config import Settings
 from jarvis_home.main import create_app
 from jarvis_home.schemas import RiskLevel, ToolInvocation, UserContext
+from jarvis_home.services.event_runtime import get_event_outbox
 
 DATABASE_URL = os.environ.get("TEST_DBOS_DATABASE_URL", "")
 pytestmark = pytest.mark.skipif(not DATABASE_URL, reason="TEST_DBOS_DATABASE_URL is not configured")
@@ -112,6 +113,13 @@ def test_approved_light_action_is_durable_verified_and_not_replayed(tmp_path: Pa
         assert body["content"]["state_witness"]["observed"]["state"] == "off"
         assert len(fake_home.calls) == 1
 
+        events = get_event_outbox(jarvis).pending()
+        assert [event["subject"] for event in events] == [
+            "home.plan.authorized.v1",
+            "home.action.completed.v1",
+        ]
+        assert all(event["payload"]["approval_id"] == pending.id for event in events)
+
         duplicate = client.post(
             f"/api/approvals/{pending.id}",
             headers=headers,
@@ -119,3 +127,4 @@ def test_approved_light_action_is_durable_verified_and_not_replayed(tmp_path: Pa
         )
         assert duplicate.status_code == 409
         assert len(fake_home.calls) == 1
+        assert len(get_event_outbox(jarvis).pending()) == 2
