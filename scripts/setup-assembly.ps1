@@ -17,8 +17,8 @@ if (-not (Select-String -Path ".env" -Pattern '^JARVIS_HOME_ASSISTANT_TOKEN=.+$'
 }
 
 Write-Host "Building the pinned JARVIS assembly..." -ForegroundColor Cyan
-docker compose -f deploy/assembly/docker-compose.yml up -d --build
+docker compose --env-file .env -f deploy/assembly/docker-compose.yml up -d --build
 
-docker compose -f deploy/assembly/docker-compose.yml ps
+docker compose --env-file .env -f deploy/assembly/docker-compose.yml ps
 Write-Host "JARVIS Home control: http://localhost:8787" -ForegroundColor Green
 Write-Host "OpenJarvis:          http://localhost:8000" -ForegroundColor Green
