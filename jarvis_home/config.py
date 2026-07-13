@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     dbos_database_url: str = ""
     state_witness_attempts: int = Field(default=8, ge=1, le=60)
     state_witness_interval_seconds: float = Field(default=1.0, ge=0.1, le=10.0)
+    nats_url: str = ""
+    nats_token: str = ""
+    nats_stream: str = "JARVIS_HOME_EVENTS"
+    nats_batch_size: int = Field(default=100, ge=1, le=1000)
+    nats_flush_interval_seconds: float = Field(default=1.0, ge=0.1, le=60.0)
+    nats_connect_timeout_seconds: float = Field(default=3.0, ge=0.1, le=30.0)
+    nats_publish_timeout_seconds: float = Field(default=3.0, ge=0.1, le=30.0)
+    nats_duplicate_window_seconds: float = Field(default=86_400.0, ge=60.0, le=604_800.0)
     data_dir: Path = Path("./data")
     backup_dir: Path = Path("./backups")
     master_key_file: Path = Path("./master.key")
@@ -86,6 +94,10 @@ class Settings(BaseSettings):
     def durable_workflows_enabled(self) -> bool:
         return bool(self.dbos_database_url.strip())
 
+    @property
+    def event_stream_enabled(self) -> bool:
+        return bool(self.nats_url.strip() and self.nats_token.strip())
+
     def ensure_directories(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.backup_dir.mkdir(parents=True, exist_ok=True)
@@ -101,6 +113,8 @@ class Settings(BaseSettings):
             errors.append("JARVIS_SESSION_SECRET is still a default value")
         if "*" in self.origin_list:
             errors.append("Wildcard CORS origins are forbidden in production")
+        if self.nats_url and len(self.nats_token) < 32:
+            errors.append("JARVIS_NATS_TOKEN must contain at least 32 characters")
         return errors
 
 
