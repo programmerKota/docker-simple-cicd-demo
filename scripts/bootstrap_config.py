@@ -116,12 +116,14 @@ def main() -> None:
         mcp_token = secrets.token_urlsafe(48)
         openjarvis_api_key = secrets.token_urlsafe(48)
         dbos_password = secrets.token_urlsafe(32)
+        nats_token = secrets.token_urlsafe(48)
         content = example.read_text(encoding="utf-8")
         content = (
             content.replace("replace-session-secret", session_secret)
             .replace("replace-mcp-token", mcp_token)
             .replace("replace-openjarvis-api-key", openjarvis_api_key)
             .replace("replace-dbos-password", dbos_password)
+            .replace("replace-nats-token", nats_token)
             .replace("replace-admin-password", generated_password)
         )
         write_private(env_file, content.encode())
@@ -147,7 +149,7 @@ def main() -> None:
         print("Username: admin")
         print(f"Password: {generated_password}")
         print("Store the password now. It cannot be recovered from the database.")
-        print("MCP, DBOS, and OpenJarvis secrets were written only to .env.")
+        print("MCP, DBOS, NATS, and OpenJarvis secrets were written only to .env.")
 
 
 if __name__ == "__main__":
