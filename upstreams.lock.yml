@@ -1,8 +1,9 @@
 schema_version: 1
 updated_at: 2026-07-13
 policy: >-
-  Upstreams are pinned before integration. Promotion requires license review,
-  vulnerability scanning, compatibility tests, and a documented rollback path.
+  Upstreams are pinned before executable integration. Promotion requires license
+  review, an immutable tag or commit and image digest, vulnerability scanning,
+  compatibility tests, and a documented rollback path.
 
 components:
   openjarvis:
@@ -10,19 +11,19 @@ components:
     revision: 6240c59ca3305c5656075cc54cd7ff32df8dca0e
     role: intelligence-runtime
     license: Apache-2.0
-    status: selected
+    status: selected-pinned
 
   home_assistant:
     repository: https://github.com/home-assistant/core
-    revision: release-2026.7
+    revision: pending-executable-pin
     role: physical-home-control-plane
     license: Apache-2.0
     status: selected
-    note: Exact image digest is pinned during executable deployment work.
+    note: Pin the installed release and container digest after deployment mode is chosen.
 
   nats:
     repository: https://github.com/nats-io/nats-server
-    revision: v2.14.0
+    revision: pending-executable-pin
     role: durable-event-bus
     license: Apache-2.0
     status: selected
@@ -67,7 +68,7 @@ components:
     revision: v0.19.1
     role: encrypted-verifiable-backup
     license: BSD-2-Clause
-    status: selected
+    status: selected-pinned
 
   eclipse_ditto:
     repository: https://github.com/eclipse-ditto/ditto
