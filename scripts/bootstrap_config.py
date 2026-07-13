@@ -100,6 +100,30 @@ servers = {toml_string(mcp_servers)}
     return output
 
 
+def render_nats_config(root: Path, env: dict[str, str]) -> Path:
+    token = env.get("JARVIS_NATS_TOKEN", "")
+    if len(token) < 32 or token.startswith("replace-"):
+        raise SystemExit("JARVIS_NATS_TOKEN is missing or unsafe")
+    quoted_token = json.dumps(token)
+    content = f'''server_name: "jarvis-home-events"
+port: 4222
+http_port: 8222
+
+authorization {{
+  token: {quoted_token}
+}}
+
+jetstream {{
+  store_dir: "/data/jetstream"
+  max_memory_store: 256MB
+  max_file_store: 2GB
+}}
+'''
+    output = root / "runtime" / "nats.conf"
+    replace_private(output, content)
+    return output
+
+
 def main() -> None:
     root = Path(__file__).resolve().parents[1]
     example = root / ".env.example"
@@ -141,15 +165,18 @@ def main() -> None:
     for directory in ("data", "backups", "plugins", "runtime"):
         (root / directory).mkdir(parents=True, exist_ok=True)
 
-    config_path = render_openjarvis_config(root, read_env(env_file))
-    print(f"Rendered {config_path.relative_to(root)}")
+    env = read_env(env_file)
+    openjarvis_path = render_openjarvis_config(root, env)
+    nats_path = render_nats_config(root, env)
+    print(f"Rendered {openjarvis_path.relative_to(root)}")
+    print(f"Rendered {nats_path.relative_to(root)}")
 
     if generated_password:
         print("\nJARVIS Home initial credentials")
         print("Username: admin")
         print(f"Password: {generated_password}")
         print("Store the password now. It cannot be recovered from the database.")
-        print("MCP, DBOS, NATS, and OpenJarvis secrets were written only to .env.")
+        print("MCP, DBOS, NATS, and OpenJarvis secrets were written only to local private files.")
 
 
 if __name__ == "__main__":
