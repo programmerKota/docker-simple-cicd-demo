@@ -85,7 +85,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: python scripts/bootstrap_config.py
-      - run: docker compose -f deploy/assembly/docker-compose.yml config --quiet
+      - run: docker compose --env-file .env -f deploy/assembly/docker-compose.yml config --quiet
 
   container:
     runs-on: ubuntu-latest
