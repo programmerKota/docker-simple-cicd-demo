@@ -35,11 +35,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Test deny-by-default household policies
-        run: >-
-          docker run --rm
-          -v "$PWD/policies:/policies:ro"
-          openpolicyagent/opa:1.18.2-static
-          test /policies -v
+        id: opa_test
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          docker run --rm \
+            -v "$PWD/policies:/policies:ro" \
+            openpolicyagent/opa:1.18.2-static \
+            test /policies -v 2>&1 | tee opa-test.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: opa-test-diagnostics
+          path: opa-test.log
+          if-no-files-found: error
+          retention-days: 7
+      - name: Enforce policy test result
+        if: steps.opa_test.outcome == 'failure'
+        run: exit 1
 
   assembly-config:
     runs-on: ubuntu-latest
