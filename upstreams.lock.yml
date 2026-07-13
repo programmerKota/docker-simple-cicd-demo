@@ -1,0 +1,86 @@
+schema_version: 1
+updated_at: 2026-07-13
+policy: >-
+  Upstreams are pinned before integration. Promotion requires license review,
+  vulnerability scanning, compatibility tests, and a documented rollback path.
+
+components:
+  openjarvis:
+    repository: https://github.com/open-jarvis/OpenJarvis
+    revision: 6240c59ca3305c5656075cc54cd7ff32df8dca0e
+    role: intelligence-runtime
+    license: Apache-2.0
+    status: selected
+
+  home_assistant:
+    repository: https://github.com/home-assistant/core
+    revision: release-2026.7
+    role: physical-home-control-plane
+    license: Apache-2.0
+    status: selected
+    note: Exact image digest is pinned during executable deployment work.
+
+  nats:
+    repository: https://github.com/nats-io/nats-server
+    revision: v2.14.0
+    role: durable-event-bus
+    license: Apache-2.0
+    status: selected
+
+  temporal:
+    repository: https://github.com/temporalio/temporal
+    revision: pending-executable-pin
+    role: durable-physical-workflows
+    license: MIT
+    status: selected
+
+  cedar:
+    repository: https://github.com/cedar-policy/cedar
+    revision: pending-executable-pin
+    role: pre-action-authorization
+    license: Apache-2.0
+    status: selected
+
+  brick:
+    repository: https://github.com/BrickSchema/Brick
+    revision: pending-executable-pin
+    role: household-semantic-model
+    license: BSD-3-Clause
+    status: selected
+
+  livekit:
+    repository: https://github.com/livekit/livekit
+    revision: pending-executable-pin
+    role: realtime-remote-voice-and-multimodal-transport
+    license: Apache-2.0
+    status: selected-optional
+
+  frigate:
+    repository: https://github.com/blakeblackshear/frigate
+    revision: pending-executable-pin
+    role: local-vision-and-nvr
+    license: MIT
+    status: selected-optional
+
+  restic:
+    repository: https://github.com/restic/restic
+    revision: v0.19.1
+    role: encrypted-verifiable-backup
+    license: BSD-2-Clause
+    status: selected
+
+  eclipse_ditto:
+    repository: https://github.com/eclipse-ditto/ditto
+    revision: not-pinned
+    role: large-scale-digital-twin-platform
+    license: EPL-2.0
+    status: deferred
+    reason: Excess operational weight for the first single-home deployment.
+
+  openclaw:
+    repository: https://github.com/openclaw/openclaw
+    revision: not-pinned
+    role: alternative-general-agent-runtime
+    license: MIT
+    status: runtime-rejected
+    reason: Duplicate runtime and unnecessary attack surface; reviewed skills may be imported through OpenJarvis.
