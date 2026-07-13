@@ -41,6 +41,13 @@ test_lock_is_denied if {
     not result.allow
 }
 
+test_toggle_is_denied if {
+    action := object.union(base_input.action, {"service": "toggle"})
+    unsafe := object.union(base_input, {"action": action})
+    result := home.decision with input as unsafe
+    not result.allow
+}
+
 test_wrong_source_is_denied if {
     unsafe := object.union(base_input, {
         "actor": {"id": "admin", "role": "agent", "source": "unknown"},
