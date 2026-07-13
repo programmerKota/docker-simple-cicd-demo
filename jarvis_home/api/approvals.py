@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from ..application import Application
 from ..schemas import ApprovalDecision, ToolResult, UserContext
 from ..services.approvals import ApprovalError
+from ..services.durable_runtime import get_durable_actions
 from .deps import current_user, get_application
 
 router = APIRouter(prefix="/api/approvals", tags=["approvals"])
@@ -33,24 +34,40 @@ async def decide(
         app.audit.record(user.username, "approval.decide", approval_id, "rejected")
         await app.events.publish("approval.rejected", {"id": approval_id})
         return ToolResult(ok=False, error="Action rejected")
-    result = await app.registry.invoke(invocation, user, bypass_policy=True)
-    app.approvals.store_result(approval_id, result.model_dump())
+
+    result = await get_durable_actions(app).execute_approved(approval_id, invocation, user)
+    app.approvals.store_result(approval_id, result.model_dump(mode="json"))
     app.audit.record(
         user.username,
         "approval.decide",
         approval_id,
         "executed" if result.ok else "error",
-        {"tool": invocation.tool_name},
+        {
+            "tool": invocation.tool_name,
+            "durable": result.metadata.get("durable", False),
+            "workflow_id": result.metadata.get("workflow_id"),
+            "state_verified": result.metadata.get("state_verified"),
+        },
     )
     if invocation.conversation_id:
         app.conversations.add_message(
             invocation.conversation_id,
             "tool",
             str(result.content if result.ok else result.error),
-            {"tool_name": invocation.tool_name, "approved": True},
+            {
+                "tool_name": invocation.tool_name,
+                "approved": True,
+                "workflow_id": result.metadata.get("workflow_id"),
+            },
         )
     await app.events.publish(
         "approval.executed",
-        {"id": approval_id, "tool": invocation.tool_name, "ok": result.ok},
+        {
+            "id": approval_id,
+            "tool": invocation.tool_name,
+            "ok": result.ok,
+            "durable": result.metadata.get("durable", False),
+            "state_verified": result.metadata.get("state_verified"),
+        },
     )
     return result
