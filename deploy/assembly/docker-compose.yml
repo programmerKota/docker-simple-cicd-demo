@@ -1,0 +1,134 @@
+name: jarvis-home-assembly
+
+services:
+  jarvis-ui:
+    image: jarvis-home:assembly-v2
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    env_file:
+      - ../../.env
+    environment:
+      JARVIS_HOST: 0.0.0.0
+      JARVIS_PORT: 8787
+      JARVIS_DATA_DIR: /app/data
+      JARVIS_BACKUP_DIR: /app/backups
+      JARVIS_MASTER_KEY_FILE: /app/master.key
+      JARVIS_OPA_URL: http://opa:8181
+    ports:
+      - "127.0.0.1:8787:8787"
+    volumes:
+      - jarvis-data:/app/data
+      - jarvis-backups:/app/backups
+      - ../../master.key:/app/master.key:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,noexec,nosuid,nodev
+
+  jarvis-mcp:
+    image: jarvis-home:assembly-v2
+    env_file:
+      - ../../.env
+    command: ["jarvis-home-mcp"]
+    environment:
+      JARVIS_MCP_HOST: 0.0.0.0
+      JARVIS_MCP_PORT: 8790
+      JARVIS_DATA_DIR: /app/data
+      JARVIS_BACKUP_DIR: /app/backups
+      JARVIS_MASTER_KEY_FILE: /app/master.key
+      JARVIS_OPA_URL: http://opa:8181
+    expose:
+      - "8790"
+    volumes:
+      - jarvis-data:/app/data
+      - jarvis-backups:/app/backups
+      - ../../master.key:/app/master.key:ro
+    depends_on:
+      opa:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,noexec,nosuid,nodev
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.create_connection(('127.0.0.1',8790),3); s.close()"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  opa:
+    image: openpolicyagent/opa:1.18.2-static
+    command: ["run", "--server", "--addr=0.0.0.0:8181", "--log-format=json", "/policies"]
+    expose:
+      - "8181"
+    volumes:
+      - ../../policies:/policies:ro
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    healthcheck:
+      test: ["CMD", "/opa", "eval", "data.jarvis.home.policy_version", "--data", "/policies"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  openjarvis:
+    build:
+      context: ../..
+      dockerfile: deploy/assembly/Dockerfile.openjarvis
+      args:
+        OPENJARVIS_REV: 6240c59ca3305c5656075cc54cd7ff32df8dca0e
+    env_file:
+      - ../../.env
+    environment:
+      OPENJARVIS_HOME: /var/lib/openjarvis
+      OPENJARVIS_CONFIG: /var/lib/openjarvis/config.toml
+      OPENJARVIS_OLLAMA_HOST: http://host.docker.internal:11434
+      OPENJARVIS_MODEL: ${JARVIS_OLLAMA_MODEL:-qwen3:8b}
+      JARVIS_MCP_URL: http://jarvis-mcp:8790/mcp
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - openjarvis-data:/var/lib/openjarvis
+    depends_on:
+      jarvis-mcp:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,noexec,nosuid,nodev
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  jarvis-data:
+  jarvis-backups:
+  openjarvis-data:
