@@ -8,6 +8,7 @@ from dbos import DBOS, SetWorkflowID
 from fastapi import FastAPI
 
 from ..schemas import ToolInvocation, ToolResult, UserContext
+from .event_runtime import get_event_outbox
 
 if TYPE_CHECKING:
     from ..application import Application
@@ -68,6 +69,16 @@ def parse_light_action(invocation: ToolInvocation) -> LightAction | None:
         desired_state="on" if service == "turn_on" else "off",
         brightness_pct=brightness,
     )
+
+
+@DBOS.step(retries_allowed=True, interval_seconds=0.25, max_attempts=5, backoff_rate=2.0)
+async def record_outbox_event_step(
+    event_id: str,
+    subject: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    inserted = get_event_outbox(get_runtime()).append(event_id, subject, payload)
+    return {"event_id": event_id, "inserted": inserted}
 
 
 @DBOS.step(retries_allowed=True, interval_seconds=1.0, max_attempts=3, backoff_rate=2.0)
@@ -135,23 +146,52 @@ async def execute_light_action_workflow(
     witness_attempts: int,
     witness_interval_seconds: float,
 ) -> dict[str, Any]:
-    action_result = await apply_light_action_step(actor, entity_id, service, brightness_pct)
-    witness = await verify_light_state_step(
-        entity_id,
-        desired_state,
-        witness_attempts,
-        witness_interval_seconds,
+    workflow_id = DBOS.workflow_id
+    base_event = {
+        "schema_version": 1,
+        "approval_id": approval_id,
+        "workflow_id": workflow_id,
+        "actor": actor,
+        "entity_id": entity_id,
+        "service": service,
+        "desired_state": desired_state,
+        "brightness_pct": brightness_pct,
+    }
+    await record_outbox_event_step(
+        f"approval:{approval_id}:authorized",
+        "home.plan.authorized.v1",
+        base_event,
     )
-    return ToolResult(
-        ok=True,
-        content={
-            "approval_id": approval_id,
-            "workflow_id": DBOS.workflow_id,
-            "action": action_result,
-            "state_witness": witness,
-        },
-        metadata={"durable": True, "state_verified": True},
-    ).model_dump(mode="json")
+    try:
+        action_result = await apply_light_action_step(actor, entity_id, service, brightness_pct)
+        witness = await verify_light_state_step(
+            entity_id,
+            desired_state,
+            witness_attempts,
+            witness_interval_seconds,
+        )
+        await record_outbox_event_step(
+            f"approval:{approval_id}:completed",
+            "home.action.completed.v1",
+            {**base_event, "state_witness": witness},
+        )
+        return ToolResult(
+            ok=True,
+            content={
+                "approval_id": approval_id,
+                "workflow_id": workflow_id,
+                "action": action_result,
+                "state_witness": witness,
+            },
+            metadata={"durable": True, "state_verified": True},
+        ).model_dump(mode="json")
+    except Exception as exc:
+        await record_outbox_event_step(
+            f"approval:{approval_id}:failed",
+            "home.action.failed.v1",
+            {**base_event, "error": str(exc)},
+        )
+        raise
 
 
 class DurableActionService:
