@@ -1,0 +1,27 @@
+FROM python:3.12-slim AS builder
+
+ARG OPENJARVIS_REV=6240c59ca3305c5656075cc54cd7ff32df8dca0e
+ENV PIP_NO_CACHE_DIR=1
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+RUN git clone --filter=blob:none https://github.com/open-jarvis/OpenJarvis.git . \
+    && git checkout --detach "${OPENJARVIS_REV}" \
+    && test "$(git rev-parse HEAD)" = "${OPENJARVIS_REV}"
+RUN python -m pip install --upgrade pip uv \
+    && uv pip install --system ".[server]"
+
+FROM python:3.12-slim AS runtime
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
+    OPENJARVIS_HOME=/var/lib/openjarvis \
+    OPENJARVIS_CONFIG=/var/lib/openjarvis/config.toml
+RUN addgroup --system openjarvis \
+    && adduser --system --ingroup openjarvis --home /var/lib/openjarvis openjarvis \
+    && mkdir -p /var/lib/openjarvis \
+    && chown -R openjarvis:openjarvis /var/lib/openjarvis
+COPY --from=builder /usr/local /usr/local
+COPY deploy/assembly/openjarvis_entrypoint.py /usr/local/bin/openjarvis-entrypoint
+RUN chmod 0555 /usr/local/bin/openjarvis-entrypoint
+USER openjarvis
+EXPOSE 8000
+ENTRYPOINT ["python", "/usr/local/bin/openjarvis-entrypoint"]
