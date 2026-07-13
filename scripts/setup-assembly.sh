@@ -17,7 +17,7 @@ if ! grep -Eq '^JARVIS_HOME_ASSISTANT_TOKEN=.+$' .env; then
 fi
 
 printf '%s\n' 'Building the pinned JARVIS assembly...'
-docker compose -f deploy/assembly/docker-compose.yml up -d --build
-docker compose -f deploy/assembly/docker-compose.yml ps
+docker compose --env-file .env -f deploy/assembly/docker-compose.yml up -d --build
+docker compose --env-file .env -f deploy/assembly/docker-compose.yml ps
 printf '%s\n' 'JARVIS Home control: http://localhost:8787'
 printf '%s\n' 'OpenJarvis:          http://localhost:8000'
