@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     env: Literal["development", "test", "production"] = "development"
     host: str = "127.0.0.1"
     port: int = 8787
+    mcp_host: str = "127.0.0.1"
+    mcp_port: int = Field(default=8790, ge=1, le=65535)
+    mcp_token: str = ""
     data_dir: Path = Path("./data")
     backup_dir: Path = Path("./backups")
     master_key_file: Path = Path("./master.key")
