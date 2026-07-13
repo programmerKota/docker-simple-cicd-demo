@@ -1,0 +1,210 @@
+from __future__ import annotations
+
+import re
+import secrets
+from typing import Any, Literal
+
+import uvicorn
+from mcp.server.fastmcp import FastMCP
+from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Receive, Scope, Send
+
+from .application import Application
+from .config import Settings, get_settings
+from .schemas import ToolInvocation, UserContext
+
+_ENTITY_ID = re.compile(r"^[a-z0-9_]+\.[a-z0-9_]+$")
+_DOMAIN = re.compile(r"^[a-z0-9_]+$")
+
+
+class BearerTokenGate:
+    """Minimal fail-closed bearer gate for the private MCP transport.
+
+    OpenJarvis already supports sending a bearer token to Streamable HTTP MCP
+    servers. This wrapper intentionally protects every HTTP request, while
+    passing ASGI lifespan events through so FastMCP can start its session
+    manager correctly.
+    """
+
+    def __init__(self, app: ASGIApp, token: str):
+        if len(token) < 32:
+            raise RuntimeError("JARVIS_MCP_TOKEN must contain at least 32 characters")
+        self.app = app
+        self.expected = f"Bearer {token}".encode("utf-8")
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        headers = {key.lower(): value for key, value in scope.get("headers", [])}
+        supplied = headers.get(b"authorization", b"")
+        if not secrets.compare_digest(supplied, self.expected):
+            response = JSONResponse(
+                {"error": "unauthorized"},
+                status_code=401,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+            await response(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
+
+
+class HomeGateway:
+    """Narrow household capability surface exposed to an external AI runtime."""
+
+    def __init__(self, application: Application):
+        self.application = application
+        # Use the owner's approval inbox but a non-owner role. Existing policy
+        # therefore permits observations, requires approval for medium-risk
+        # actions, and denies high-risk actions before execution.
+        self.agent_user = UserContext(
+            username=application.settings.admin_username,
+            role="agent",
+            source="openjarvis-mcp",
+        )
+
+    async def status(self) -> dict[str, Any]:
+        status = await self.application.status()
+        return {
+            "gateway": "ready",
+            "home_assistant": status["home_assistant"],
+            "audit": status["audit"],
+            "pending_approvals": len(
+                self.application.approvals.list_pending(self.application.settings.admin_username)
+            ),
+        }
+
+    async def observe(
+        self,
+        entity_id: str = "",
+        domain: str = "",
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        if entity_id:
+            self._validate_entity_id(entity_id)
+            result = await self.application.registry.invoke(
+                ToolInvocation(tool_name="home.get_state", arguments={"entity_id": entity_id}),
+                self.agent_user,
+            )
+            return result.model_dump(mode="json")
+
+        normalized_domain = domain.strip().lower()
+        if normalized_domain and not _DOMAIN.fullmatch(normalized_domain):
+            raise ValueError("Invalid Home Assistant domain")
+        bounded_limit = min(max(int(limit), 1), 100)
+        result = await self.application.registry.invoke(
+            ToolInvocation(
+                tool_name="home.list_entities",
+                arguments={"domain": normalized_domain or None, "limit": bounded_limit},
+            ),
+            self.agent_user,
+        )
+        return result.model_dump(mode="json")
+
+    async def propose_light_action(
+        self,
+        entity_id: str,
+        action: Literal["turn_on", "turn_off", "toggle"],
+        brightness_pct: int | None = None,
+    ) -> dict[str, Any]:
+        """Create, but never silently execute, one narrowly scoped light action."""
+        self._validate_entity_id(entity_id)
+        if not entity_id.startswith("light."):
+            raise ValueError("Only light entities are accepted by this first production capability")
+        if brightness_pct is not None:
+            if action != "turn_on":
+                raise ValueError("brightness_pct is valid only with turn_on")
+            if not 1 <= brightness_pct <= 100:
+                raise ValueError("brightness_pct must be between 1 and 100")
+
+        service_data: dict[str, Any] = {}
+        if brightness_pct is not None:
+            service_data["brightness_pct"] = brightness_pct
+
+        result = await self.application.registry.invoke(
+            ToolInvocation(
+                tool_name="home.call_service",
+                arguments={
+                    "domain": "light",
+                    "service": action,
+                    "service_data": service_data,
+                    "target": {"entity_id": entity_id},
+                },
+            ),
+            self.agent_user,
+        )
+        return result.model_dump(mode="json")
+
+    def pending_approvals(self) -> list[dict[str, Any]]:
+        return [
+            item.model_dump(mode="json")
+            for item in self.application.approvals.list_pending(self.application.settings.admin_username)
+        ]
+
+    @staticmethod
+    def _validate_entity_id(entity_id: str) -> None:
+        if not _ENTITY_ID.fullmatch(entity_id.strip().lower()):
+            raise ValueError("Invalid Home Assistant entity_id")
+
+
+def build_mcp_app(
+    settings: Settings | None = None,
+    application: Application | None = None,
+) -> ASGIApp:
+    settings = settings or get_settings()
+    application = application or Application(settings)
+    gateway = HomeGateway(application)
+    mcp = FastMCP(
+        "JARVIS Home Safety Gateway",
+        instructions=(
+            "Observe the home through read-only tools. Physical light changes are proposals: "
+            "they create an approval request and do not execute until the owner approves them "
+            "in JARVIS Home. Never claim execution before the returned result confirms it."
+        ),
+        host=settings.mcp_host,
+        port=settings.mcp_port,
+        streamable_http_path="/mcp",
+        json_response=True,
+        stateless_http=True,
+    )
+
+    @mcp.tool(name="home_gateway_status")
+    async def home_gateway_status() -> dict[str, Any]:
+        """Read gateway, Home Assistant, audit-chain, and approval status."""
+        return await gateway.status()
+
+    @mcp.tool(name="home_observe")
+    async def home_observe(
+        entity_id: str = "",
+        domain: str = "",
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """Read one entity or a bounded list of Home Assistant entity states."""
+        return await gateway.observe(entity_id=entity_id, domain=domain, limit=limit)
+
+    @mcp.tool(name="home_propose_light_action")
+    async def home_propose_light_action(
+        entity_id: str,
+        action: Literal["turn_on", "turn_off", "toggle"],
+        brightness_pct: int | None = None,
+    ) -> dict[str, Any]:
+        """Propose a light action. Owner approval is mandatory before execution."""
+        return await gateway.propose_light_action(entity_id, action, brightness_pct)
+
+    @mcp.tool(name="home_list_pending_approvals")
+    def home_list_pending_approvals() -> list[dict[str, Any]]:
+        """List physical actions waiting for the owner in JARVIS Home."""
+        return gateway.pending_approvals()
+
+    return BearerTokenGate(mcp.streamable_http_app(), settings.mcp_token)
+
+
+def serve() -> None:
+    settings = get_settings()
+    uvicorn.run(
+        build_mcp_app(settings),
+        host=settings.mcp_host,
+        port=settings.mcp_port,
+        log_level=settings.log_level.lower(),
+        proxy_headers=False,
+    )
