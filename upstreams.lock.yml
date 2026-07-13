@@ -1,4 +1,4 @@
-schema_version: 2
+schema_version: 3
 updated_at: 2026-07-13
 policy: >-
   Upstreams are pinned before executable integration. Promotion requires license
@@ -22,46 +22,57 @@ components:
 
   home_assistant:
     repository: https://github.com/home-assistant/core
-    revision: pending-executable-pin
+    revision: pending-target-installation-pin
     role: physical-home-control-plane
     license: Apache-2.0
     status: selected
-    note: Pin the installed release and image digest after deployment mode is chosen.
+    note: Pin the actual installed release after the target Home Assistant deployment is inventoried.
 
   opa:
     repository: https://github.com/open-policy-agent/opa
-    revision: pending-executable-pin
+    revision: v1.18.2
+    image: openpolicyagent/opa:1.18.2-static
     role: pre-action-policy-decision-point
     license: Apache-2.0
-    status: selected
+    status: selected-pinned
 
   dbos_python:
     repository: https://github.com/dbos-inc/dbos-transact-py
-    revision: pending-executable-pin
+    revision: v2.26.0
+    package: dbos==2.26.0
     role: durable-physical-workflows
     license: MIT
-    status: selected
+    status: selected-pinned
+
+  postgres:
+    repository: https://github.com/docker-library/postgres
+    revision: 18.2-bookworm
+    image: postgres:18.2-bookworm
+    role: dbos-system-database
+    license: PostgreSQL
+    status: selected-tag-pinned
+    note: Resolve and record the multi-architecture image digest before production promotion.
 
   nats:
     repository: https://github.com/nats-io/nats-server
     revision: pending-executable-pin
     role: durable-event-bus
     license: Apache-2.0
-    status: selected
+    status: selected-next
 
   brick:
     repository: https://github.com/BrickSchema/Brick
     revision: pending-executable-pin
     role: household-semantic-model
     license: BSD-3-Clause
-    status: selected
+    status: selected-next
 
   oxigraph:
     repository: https://github.com/oxigraph/oxigraph
     revision: pending-executable-pin
     role: embedded-rdf-and-sparql-store
     license: MIT-or-Apache-2.0
-    status: selected
+    status: selected-next
 
   livekit:
     repository: https://github.com/livekit/livekit
