@@ -2,8 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, assembly-v2]
   pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 3 * * 1"
 
 permissions:
   contents: read
@@ -27,6 +30,27 @@ jobs:
       - run: pytest --cov=jarvis_home --cov-report=term-missing
       - run: pip-audit --skip-editable
 
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test deny-by-default household policies
+        run: >-
+          docker run --rm
+          -v "$PWD/policies:/policies:ro"
+          openpolicyagent/opa:1.18.2-static
+          test /policies -v
+
+  assembly-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/bootstrap_config.py
+      - run: docker compose -f deploy/assembly/docker-compose.yml config --quiet
+
   container:
     runs-on: ubuntu-latest
     steps:
@@ -39,3 +63,20 @@ jobs:
           tags: jarvis-home:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  upstream-openjarvis:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/assembly/Dockerfile.openjarvis
+          push: false
+          tags: jarvis-home-openjarvis-compat:test
+          build-args: |
+            OPENJARVIS_REV=6240c59ca3305c5656075cc54cd7ff32df8dca0e
+          cache-from: type=gha,scope=openjarvis
+          cache-to: type=gha,mode=max,scope=openjarvis
