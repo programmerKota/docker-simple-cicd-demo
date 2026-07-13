@@ -1,4 +1,4 @@
-schema_version: 1
+schema_version: 2
 updated_at: 2026-07-13
 policy: >-
   Upstreams are pinned before executable integration. Promotion requires license
@@ -13,13 +13,34 @@ components:
     license: Apache-2.0
     status: selected-pinned
 
+  mcp_python_sdk:
+    repository: https://github.com/modelcontextprotocol/python-sdk
+    revision: v1.28.1
+    role: authenticated-ai-tool-protocol
+    license: MIT
+    status: selected-pinned
+
   home_assistant:
     repository: https://github.com/home-assistant/core
     revision: pending-executable-pin
     role: physical-home-control-plane
     license: Apache-2.0
     status: selected
-    note: Pin the installed release and container digest after deployment mode is chosen.
+    note: Pin the installed release and image digest after deployment mode is chosen.
+
+  opa:
+    repository: https://github.com/open-policy-agent/opa
+    revision: pending-executable-pin
+    role: pre-action-policy-decision-point
+    license: Apache-2.0
+    status: selected
+
+  dbos_python:
+    repository: https://github.com/dbos-inc/dbos-transact-py
+    revision: pending-executable-pin
+    role: durable-physical-workflows
+    license: MIT
+    status: selected
 
   nats:
     repository: https://github.com/nats-io/nats-server
@@ -28,25 +49,18 @@ components:
     license: Apache-2.0
     status: selected
 
-  temporal:
-    repository: https://github.com/temporalio/temporal
-    revision: pending-executable-pin
-    role: durable-physical-workflows
-    license: MIT
-    status: selected
-
-  cedar:
-    repository: https://github.com/cedar-policy/cedar
-    revision: pending-executable-pin
-    role: pre-action-authorization
-    license: Apache-2.0
-    status: selected
-
   brick:
     repository: https://github.com/BrickSchema/Brick
     revision: pending-executable-pin
     role: household-semantic-model
     license: BSD-3-Clause
+    status: selected
+
+  oxigraph:
+    repository: https://github.com/oxigraph/oxigraph
+    revision: pending-executable-pin
+    role: embedded-rdf-and-sparql-store
+    license: MIT-or-Apache-2.0
     status: selected
 
   livekit:
@@ -69,6 +83,30 @@ components:
     role: encrypted-verifiable-backup
     license: BSD-2-Clause
     status: selected-pinned
+
+  temporal:
+    repository: https://github.com/temporalio/temporal
+    revision: not-pinned
+    role: large-scale-durable-workflows
+    license: MIT
+    status: deferred
+    reason: Maturity leader, but a larger operational control plane than the first single-home deployment requires.
+
+  restate:
+    repository: https://github.com/restatedev/restate
+    revision: not-pinned
+    role: lightweight-durable-services
+    license: BSL-1.1
+    status: deferred
+    reason: Excellent technical fit, but not the default open-product foundation because the server is source-available rather than OSI open source.
+
+  cedar:
+    repository: https://github.com/cedar-policy/cedar
+    revision: not-pinned
+    role: analyzable-authorization-language
+    license: Apache-2.0
+    status: deferred
+    reason: Retained for a future formal-verification profile; OPA is more operationally mature for the first executable integration.
 
   eclipse_ditto:
     repository: https://github.com/eclipse-ditto/ditto
