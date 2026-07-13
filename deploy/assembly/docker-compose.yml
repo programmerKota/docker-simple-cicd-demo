@@ -93,21 +93,18 @@ services:
 
   openjarvis:
     build:
-      context: ../..
-      dockerfile: deploy/assembly/Dockerfile.openjarvis
-      args:
-        OPENJARVIS_REV: 6240c59ca3305c5656075cc54cd7ff32df8dca0e
+      context: https://github.com/open-jarvis/OpenJarvis.git#6240c59ca3305c5656075cc54cd7ff32df8dca0e
+      dockerfile: deploy/docker/Dockerfile
     env_file:
       - ../../.env
     environment:
-      OPENJARVIS_HOME: /var/lib/openjarvis
-      OPENJARVIS_CONFIG: /var/lib/openjarvis/config.toml
-      OPENJARVIS_OLLAMA_HOST: http://host.docker.internal:11434
-      JARVIS_MCP_URL: http://jarvis-mcp:8790/mcp
+      OPENJARVIS_HOME: /home/openjarvis/.openjarvis
+      OPENJARVIS_CONFIG: /config/openjarvis-config.toml
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
-      - openjarvis-data:/var/lib/openjarvis
+      - openjarvis-data:/home/openjarvis/.openjarvis
+      - ../../runtime/openjarvis-config.toml:/config/openjarvis-config.toml:ro
     depends_on:
       jarvis-mcp:
         condition: service_healthy
@@ -121,7 +118,7 @@ services:
       interval: 30s
       timeout: 5s
       retries: 5
-      start_period: 60s
+      start_period: 90s
 
 volumes:
   jarvis-data:
