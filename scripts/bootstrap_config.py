@@ -28,7 +28,7 @@ def replace_private(path: Path, content: str) -> None:
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     fd = os.open(temporary, flags, 0o600)
     try:
-        os.write(fd, content.encode("utf-8"))
+        os.write(fd, content.encode())
     finally:
         os.close(fd)
     os.replace(temporary, path)
@@ -115,14 +115,16 @@ def main() -> None:
         session_secret = secrets.token_urlsafe(48)
         mcp_token = secrets.token_urlsafe(48)
         openjarvis_api_key = secrets.token_urlsafe(48)
+        dbos_password = secrets.token_urlsafe(32)
         content = example.read_text(encoding="utf-8")
         content = (
             content.replace("replace-session-secret", session_secret)
             .replace("replace-mcp-token", mcp_token)
             .replace("replace-openjarvis-api-key", openjarvis_api_key)
+            .replace("replace-dbos-password", dbos_password)
             .replace("replace-admin-password", generated_password)
         )
-        write_private(env_file, content.encode("utf-8"))
+        write_private(env_file, content.encode())
         print(f"Created {env_file.name}")
     else:
         print(f"Keeping existing {env_file.name}")
@@ -145,7 +147,7 @@ def main() -> None:
         print("Username: admin")
         print(f"Password: {generated_password}")
         print("Store the password now. It cannot be recovered from the database.")
-        print("MCP and OpenJarvis API secrets were written only to .env.")
+        print("MCP, DBOS, and OpenJarvis secrets were written only to .env.")
 
 
 if __name__ == "__main__":
