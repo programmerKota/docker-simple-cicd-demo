@@ -32,10 +32,15 @@ def main() -> None:
     if not env_file.exists():
         generated_password = secrets.token_urlsafe(18)
         session_secret = secrets.token_urlsafe(48)
+        mcp_token = secrets.token_urlsafe(48)
+        openjarvis_api_key = secrets.token_urlsafe(48)
         content = example.read_text(encoding="utf-8")
-        content = content.replace(
-            "replace-with-at-least-32-random-characters", session_secret
-        ).replace("replace-this-now", generated_password)
+        content = (
+            content.replace("replace-session-secret", session_secret)
+            .replace("replace-mcp-token", mcp_token)
+            .replace("replace-openjarvis-api-key", openjarvis_api_key)
+            .replace("replace-admin-password", generated_password)
+        )
         write_private(env_file, content.encode("utf-8"))
         print(f"Created {env_file.name}")
     else:
@@ -57,6 +62,7 @@ def main() -> None:
         print("Username: admin")
         print(f"Password: {generated_password}")
         print("Store the password now. It cannot be recovered from the database.")
+        print("MCP and OpenJarvis API secrets were written only to .env.")
 
 
 if __name__ == "__main__":
