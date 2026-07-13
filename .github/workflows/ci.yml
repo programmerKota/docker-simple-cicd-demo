@@ -78,7 +78,23 @@ jobs:
           cache: pip
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e '.[dev]'
-      - run: pytest -v tests/integration/test_dbos_light_workflow.py
+      - name: Run DBOS approval workflow integration
+        id: durable_test
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          pytest -vv -s tests/integration/test_dbos_light_workflow.py 2>&1 | tee durable-integration.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: durable-integration-diagnostics
+          path: durable-integration.log
+          if-no-files-found: error
+          retention-days: 7
+      - name: Enforce durable integration result
+        if: steps.durable_test.outcome == 'failure'
+        run: exit 1
 
   policy:
     runs-on: ubuntu-latest
