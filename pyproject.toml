@@ -26,7 +26,9 @@ dependencies = [
   "rich>=13.9,<15",
   "mcp==1.28.1",
   "dbos==2.26.0",
-  "nats-py==2.15.0"
+  "nats-py==2.15.0",
+  "pyoxigraph==0.5.9",
+  "websockets>=15,<17"
 ]
 
 [project.optional-dependencies]
