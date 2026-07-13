@@ -16,6 +16,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from .api import approvals, audit, auth, backup, chat, home, memory, routines, system, voice
 from .application import Application
 from .config import Settings, get_settings
+from .services.durable_runtime import get_durable_actions
 
 
 class RequestSecurityMiddleware:
@@ -70,11 +71,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         raise RuntimeError("Unsafe production configuration: " + "; ".join(errors))
 
     jarvis = Application(settings)
+    durable_actions = get_durable_actions(jarvis)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         await jarvis.routines.start()
-        jarvis.audit.record("system", "application.start", "jarvis", "success")
+        recovered = await durable_actions.recover_approved_without_result()
+        jarvis.audit.record(
+            "system",
+            "application.start",
+            "jarvis",
+            "success",
+            {"recovered_approvals": recovered, "durable_workflows": durable_actions.enabled},
+        )
         try:
             yield
         finally:
@@ -83,12 +92,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(
         title="JARVIS Home",
-        version="1.0.0",
+        version="1.1.0a1",
         docs_url="/docs" if settings.env != "production" else None,
         redoc_url=None,
         lifespan=lifespan,
     )
     app.state.jarvis = jarvis
+    durable_actions.attach_fastapi(app)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.origin_list,
