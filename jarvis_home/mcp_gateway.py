@@ -62,9 +62,6 @@ class HomeGateway:
     ):
         self.application = application
         self.policy_client = policy_client or OPAClient(application.settings.opa_url)
-        # Use the owner's approval inbox but a non-owner role. The existing
-        # execution policy therefore permits observations, creates approvals for
-        # medium-risk actions, and denies high-risk actions before execution.
         self.agent_user = UserContext(
             username=application.settings.admin_username,
             role="agent",
@@ -90,9 +87,10 @@ class HomeGateway:
         limit: int = 50,
     ) -> dict[str, Any]:
         if entity_id:
-            self._validate_entity_id(entity_id)
+            normalized_entity = entity_id.strip().lower()
+            self._validate_entity_id(normalized_entity)
             result = await self.application.registry.invoke(
-                ToolInvocation(tool_name="home.get_state", arguments={"entity_id": entity_id}),
+                ToolInvocation(tool_name="home.get_state", arguments={"entity_id": normalized_entity}),
                 self.agent_user,
             )
             return result.model_dump(mode="json")
@@ -113,10 +111,10 @@ class HomeGateway:
     async def propose_light_action(
         self,
         entity_id: str,
-        action: Literal["turn_on", "turn_off", "toggle"],
+        action: Literal["turn_on", "turn_off"],
         brightness_pct: int | None = None,
     ) -> dict[str, Any]:
-        """Policy-check and create, but never silently execute, one light action."""
+        """Policy-check and create, but never silently execute, one idempotent light action."""
         normalized_entity = entity_id.strip().lower()
         self._validate_entity_id(normalized_entity)
         if not normalized_entity.startswith("light."):
@@ -193,9 +191,9 @@ def build_mcp_app(
     mcp = FastMCP(
         "JARVIS Home Safety Gateway",
         instructions=(
-            "Observe the home through read-only tools. Physical light changes are proposals: "
-            "they pass an external policy service and create an owner approval request. "
-            "Never claim execution before a later state witness confirms it."
+            "Observe the home through read-only tools. Physical light changes are idempotent "
+            "turn_on or turn_off proposals: they pass an external policy service and create "
+            "an owner approval request. Never claim execution before a state witness confirms it."
         ),
         host=settings.mcp_host,
         port=settings.mcp_port,
@@ -221,10 +219,10 @@ def build_mcp_app(
     @mcp.tool(name="home_propose_light_action")
     async def home_propose_light_action(
         entity_id: str,
-        action: Literal["turn_on", "turn_off", "toggle"],
+        action: Literal["turn_on", "turn_off"],
         brightness_pct: int | None = None,
     ) -> dict[str, Any]:
-        """Propose a light action. Policy and owner approval are mandatory."""
+        """Propose an idempotent light action. Policy and owner approval are mandatory."""
         return await gateway.propose_light_action(entity_id, action, brightness_pct)
 
     @mcp.tool(name="home_list_pending_approvals")
