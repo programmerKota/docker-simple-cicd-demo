@@ -15,6 +15,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
@@ -25,10 +26,31 @@ jobs:
           cache: pip
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e '.[dev]'
-      - run: ruff check .
-      - run: mypy jarvis_home
-      - run: pytest --cov=jarvis_home --cov-report=term-missing
-      - run: pip-audit --skip-editable
+      - name: Run all quality gates
+        id: quality
+        continue-on-error: true
+        shell: bash
+        run: |
+          status=0
+          ruff check . 2>&1 | tee ruff.log || status=1
+          mypy jarvis_home 2>&1 | tee mypy.log || status=1
+          pytest --cov=jarvis_home --cov-report=term-missing 2>&1 | tee pytest.log || status=1
+          pip-audit --skip-editable 2>&1 | tee pip-audit.log || status=1
+          exit "$status"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: python-${{ matrix.python-version }}-diagnostics
+          path: |
+            ruff.log
+            mypy.log
+            pytest.log
+            pip-audit.log
+          if-no-files-found: error
+          retention-days: 7
+      - name: Enforce quality result
+        if: steps.quality.outcome == 'failure'
+        run: exit 1
 
   policy:
     runs-on: ubuntu-latest
