@@ -1,11 +1,21 @@
 name: jarvis-home-assembly
 
+x-jarvis-build: &jarvis-build
+  context: ../..
+  dockerfile: Dockerfile
+
+x-jarvis-security: &jarvis-security
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  read_only: true
+  restart: unless-stopped
+
 services:
   jarvis-ui:
     image: jarvis-home:assembly-v2
-    build:
-      context: ../..
-      dockerfile: Dockerfile
+    build: *jarvis-build
     env_file:
       - ../../.env
     environment:
@@ -23,17 +33,13 @@ services:
       - ../../master.key:/app/master.key:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    read_only: true
+    <<: *jarvis-security
     tmpfs:
       - /tmp:size=128m,noexec,nosuid,nodev
 
   jarvis-mcp:
     image: jarvis-home:assembly-v2
+    build: *jarvis-build
     env_file:
       - ../../.env
     command: ["jarvis-home-mcp"]
@@ -55,12 +61,7 @@ services:
         condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    read_only: true
+    <<: *jarvis-security
     tmpfs:
       - /tmp:size=128m,noexec,nosuid,nodev
     healthcheck:
@@ -102,7 +103,6 @@ services:
       OPENJARVIS_HOME: /var/lib/openjarvis
       OPENJARVIS_CONFIG: /var/lib/openjarvis/config.toml
       OPENJARVIS_OLLAMA_HOST: http://host.docker.internal:11434
-      OPENJARVIS_MODEL: ${JARVIS_OLLAMA_MODEL:-qwen3:8b}
       JARVIS_MCP_URL: http://jarvis-mcp:8790/mcp
     ports:
       - "127.0.0.1:8000:8000"
@@ -113,12 +113,7 @@ services:
         condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    read_only: true
+    <<: *jarvis-security
     tmpfs:
       - /tmp:size=256m,noexec,nosuid,nodev
     healthcheck:
