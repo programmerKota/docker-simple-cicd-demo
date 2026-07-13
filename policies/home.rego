@@ -10,7 +10,7 @@ default decision := {
     "allow": false,
     "require_approval": true,
     "reason": "No household policy grants this capability",
-    "policy_version": policy_version,
+    "policy_version": "home-policy-v1",
 }
 
 decision := {
