@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jarvis-home"
-version = "1.0.0"
-description = "Local-first personal home AI with policy-controlled automation"
+version = "1.1.0a1"
+description = "Local-first household safety gateway and home intelligence layer"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "Apache-2.0"}
@@ -23,7 +23,8 @@ dependencies = [
   "croniter>=6,<7",
   "PyYAML>=6.0,<7",
   "typer>=0.15,<1",
-  "rich>=13.9,<15"
+  "rich>=13.9,<15",
+  "mcp==1.28.1"
 ]
 
 [project.optional-dependencies]
@@ -39,6 +40,7 @@ voice = ["faster-whisper>=1.1,<2"]
 
 [project.scripts]
 jarvis = "jarvis_home.cli:app"
+jarvis-home-mcp = "jarvis_home.mcp_gateway:serve"
 
 [tool.setuptools.packages.find]
 include = ["jarvis_home*"]
