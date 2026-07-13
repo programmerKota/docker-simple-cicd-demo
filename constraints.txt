@@ -15,3 +15,5 @@ rich==14.3.4
 mcp==1.28.1
 dbos==2.26.0
 nats-py==2.15.0
+pyoxigraph==0.5.9
+websockets==16.0
