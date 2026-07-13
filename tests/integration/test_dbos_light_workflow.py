@@ -49,7 +49,7 @@ class FakeHomeAssistant:
 
 
 def integration_settings(tmp_path: Path) -> Settings:
-    return Settings(
+    settings = Settings(
         env="test",
         data_dir=tmp_path / "data",
         backup_dir=tmp_path / "backups",
@@ -65,6 +65,8 @@ def integration_settings(tmp_path: Path) -> Settings:
         ollama_url="http://127.0.0.1:9",
         home_assistant_url="http://127.0.0.1:9",
     )
+    settings.ensure_directories()
+    return settings
 
 
 def test_approved_light_action_is_durable_verified_and_not_replayed(tmp_path: Path) -> None:
